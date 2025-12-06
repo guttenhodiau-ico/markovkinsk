@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Статистика -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center bg-light p-3 rounded">
+            <div>
+                <h5 class="mb-0">📊 Статистика</h5>
+                <div>
+                    <span class="badge bg-primary stats-badge">Всего: {{ stats.total }}</span>
+                    <span class="badge bg-success stats-badge">Выполнено: {{ stats.completed }}</span>
+                    <span class="badge bg-warning text-dark stats-badge">Активно: {{ stats.active }}</span>
+                </div>
+            </div>
+            <div>
+                <a href="/" class="btn btn-outline-primary btn-sm">Обновить</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="btn-group" role="group">
+            <a href="/?status=all" class="btn btn-outline-secondary {% if filter_status == 'all' %}active{% endif %}">Все</a>
+            <a href="/?status=active" class="btn btn-outline-secondary {% if filter_status == 'active' %}active{% endif %}">Активные</a>
+            <a href="/?status=completed" class="btn btn-outline-secondary {% if filter_status == 'completed' %}active{% endif %}">Выполненные</a>
+        </div>
+    </div>
+</div>
+
+<!-- Форма добавления задачи -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">➕ Добавить новую задачу</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/tasks">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <input type="text" name="title" class="form-control" placeholder="Название задачи *" required>
+                        </div>
+                        <div class="col-md-4">
+                            <input type="text" name="description" class="form-control" placeholder="Описание (необязательно)">
+                        </div>
+                        <div class="col-md-2">
+                            <select name="priority" class="form-select">
+                                <option value="низкий">Низкий</option>
+                                <option value="средний" selected>Средний</option>
+                                <option value="высокий">Высокий</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-success w-100">Добавить</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Список задач -->
+{% if tasks %}
+    <div class="row">
+        {% for task in tasks %}
+            {% set priority_class = {
+                'высокий': 'priority-high',
+                'средний': 'priority-medium',
+                'низкий': 'priority-low'
+            }[task.priority] %}
+            <div class="col-12 mb-2">
+                <div class="card task-card {{ priority_class }}">
+                    <div class="card-body d-flex align-items-center">
+                        <!-- Статус -->
+                        <form method="POST" action="/tasks/{{ task.id }}/toggle" style="margin: 0;">
+                            <button type="submit" class="btn {{ 'btn-success' if task.is_completed else 'btn-outline-secondary' }} btn-sm me-3"
+                                    title="{{ 'Отметить как невыполненное' if task.is_completed else 'Отметить как выполненное' }}">
+                                {% if task.is_completed %}
+                                    ✅
+                                {% else %}
+                                    ◻
+                                {% endif %}
+                            </button>
+                        </form>
+
+                        <!-- Основная информация -->
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1 {% if task.is_completed %}text-decoration-line-through text-muted{% endif %}">
+                                {{ task.title }}
+                                {% if task.category_name %}
+                                    <span class="badge bg-secondary">{{ task.category_name }}</span>
+                                {% endif %}
+                            </h6>
+                            {% if task.description %}
+                                <p class="mb-1 text-muted small">{{ task.description }}</p>
+                            {% endif %}
+                            <div class="d-flex gap-2 small">
+                                <span class="badge bg-{{ 'danger' if task.priority == 'высокий' else 'warning' if task.priority == 'средний' else 'success' }}">
+                                    {{ task.priority }}
+                                </span>
+                                {% if task.deadline %}
+                                    <span class="text-muted">До: {{ task.deadline[:16] }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Удаление -->
+                        <form method="POST" action="/tasks/{{ task.id }}/delete" style="margin: 0;" 
+                              onsubmit="return confirm('Удалить задачу «{{ task.title }}»?');">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                🗑️ Удалить
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="alert alert-info text-center">
+        <strong>Нет задач</strong><br>
+        Добавьте первую задачу выше!
+    </div>
+{% endif %}
+{% endblock %}
