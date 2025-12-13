@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./smart_todo.db:/app/smart_todo.db
+    environment:
+      - FLASK_ENV=development
+      - FLASK_APP=src/backend/app.py
+    depends_on:
+      - db
+
+  # Если вы хотите использовать PostgreSQL или MySQL — раскомментируйте и настройте
+  # db:
+  #   image: postgres:13
+  #   environment:
+  #     POSTGRES_DB: todo_db
+  #     POSTGRES_USER: user
+  #     POSTGRES_PASSWORD: password
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  # postgres_data:  # Раскомментируйте, если используете PostgreSQL
