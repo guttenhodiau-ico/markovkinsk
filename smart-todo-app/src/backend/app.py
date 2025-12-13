@@ -1,17 +1,15 @@
-cat > src/backend/app.py <<'EOF'
 from flask import Flask, request, jsonify, render_template, redirect
 import sqlite3
 import os
 from datetime import datetime
+from database import init_db
 
 # Путь к корню проекта
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 DATABASE_PATH = os.path.join(PROJECT_ROOT, 'smart_todo.db')
 
-# Создаём Flask-приложение и явно указываем папку шаблонов
+# Создаём Flask-приложение с явным указанием папки шаблонов
 app = Flask(__name__, template_folder=os.path.join(PROJECT_ROOT, 'templates'))
-
-# --- Вспомогательные функции ---
 
 def get_db_connection():
     conn = sqlite3.connect(DATABASE_PATH)
