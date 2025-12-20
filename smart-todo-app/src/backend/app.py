@@ -1,213 +1,203 @@
-from flask import Flask, request, jsonify, render_template, redirect
-import sqlite3
-import os
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from datetime import datetime
-from database import init_db
 
-# Путь к корню проекта
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-DATABASE_PATH = os.path.join(PROJECT_ROOT, 'smart_todo.db')
+app = Flask(__name__)
 
-# Создаём Flask-приложение с явным указанием папки шаблонов
-app = Flask(__name__, template_folder=os.path.join(PROJECT_ROOT, 'templates'))
 
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+# Глобальное хранилище задач
+class TaskStore:
+    def __init__(self):
+        self.tasks = []
+        self._load_initial_data()
 
-def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    def _load_initial_data(self):
+        """Загрузка начальных данных только если список пуст"""
+        if not self.tasks:
+            self.tasks = [
+                {'id': 1, 'title': 'Изучить Flask', 'completed': True, 'priority': 'high', 'created_at': '2024-01-20'},
+                {'id': 2, 'title': 'Написать ToDo приложение', 'completed': False, 'priority': 'medium',
+                 'created_at': '2024-01-21'},
+                {'id': 3, 'title': 'Добавить стили', 'completed': False, 'priority': 'high',
+                 'created_at': '2024-01-22'},
+                {'id': 4, 'title': 'Протестировать приложение', 'completed': False, 'priority': 'low',
+                 'created_at': '2024-01-22'},
+            ]
 
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            color TEXT DEFAULT '#CCCCCC'
-        )
-    ''')
+    def get_all(self):
+        return self.tasks
 
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            description TEXT,
-            priority TEXT CHECK(priority IN ('низкий', 'средний', 'высокий')) NOT NULL DEFAULT 'средний',
-            category_id INTEGER,
-            deadline DATETIME,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            is_completed BOOLEAN DEFAULT 0,
-            FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
-        )
-    ''')
+    def get_by_id(self, task_id):
+        for task in self.tasks:
+            if task['id'] == task_id:
+                return task
+        return None
 
-    # Индексы
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_status_deadline ON tasks (is_completed, deadline)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks (priority)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_category_id ON tasks (category_id)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_deadline ON tasks (deadline)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_title ON tasks (title)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks (created_at)')
+    def add(self, title, priority='medium'):
+        task_id = max(task['id'] for task in self.tasks) + 1 if self.tasks else 1
+        new_task = {
+            'id': task_id,
+            'title': title.strip(),
+            'completed': False,
+            'priority': priority,
+            'created_at': datetime.now().strftime('%Y-%m-%d')
+        }
+        self.tasks.append(new_task)
+        return new_task
 
-    # Тестовые данные (если пусто)
-    if not cursor.execute("SELECT 1 FROM categories LIMIT 1").fetchone():
-        cursor.executemany("INSERT INTO categories (name, color) VALUES (?, ?)",
-                           [('Работа', '#FF5733'), ('Личное', '#33FF57'), ('Учеба', '#3357FF')])
-        cursor.executemany("""
-            INSERT INTO tasks (title, description, priority, category_id, deadline, is_completed)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, [
-            ("Подготовить презентацию", "Для встречи с клиентом", "высокий", 1, "2025-12-10 18:00:00", False),
-            ("Позвонить маме", "Обсудить планы на выходные", "средний", 2, "2025-12-08 20:00:00", False),
-            ("Прочитать главу 5", "По курсу Python", "высокий", 3, "2025-12-12 23:59:59", False),
-            ("Купить продукты", "Молоко, хлеб, яйца", "низкий", 2, None, False),
-            ("Отправить отчёт", "За прошлый месяц", "высокий", 1, "2025-12-07 10:00:00", True),
-        ])
+    def update(self, task_id, **kwargs):
+        for task in self.tasks:
+            if task['id'] == task_id:
+                for key, value in kwargs.items():
+                    task[key] = value
+                return task
+        return None
 
-    conn.commit()
-    conn.close()
+    def delete(self, task_id):
+        self.tasks = [task for task in self.tasks if task['id'] != task_id]
+        return True
 
-# Инициализируем БД при запуске
-init_db()
+    def clear(self):
+        self.tasks = []
 
-# --- API Endpoints ---
+    def count(self):
+        return len(self.tasks)
 
-@app.route('/api/tasks', methods=['GET'])
-def get_tasks():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT t.*, c.name AS category_name, c.color AS category_color
-        FROM tasks t
-        LEFT JOIN categories c ON t.category_id = c.id
-        ORDER BY t.created_at DESC
-    ''')
-    tasks = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    return jsonify(tasks)
+    def count_completed(self):
+        return len([task for task in self.tasks if task['completed']])
 
-@app.route('/api/tasks/<int:task_id>', methods=['GET'])
-def get_task(task_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT t.*, c.name AS category_name, c.color AS category_color
-        FROM tasks t
-        LEFT JOIN categories c ON t.category_id = c.id
-        WHERE t.id = ?
-    ''', (task_id,))
-    task = cursor.fetchone()
-    conn.close()
-    if task is None:
-        return jsonify({'error': 'Task not found'}), 404
-    return jsonify(dict(task))
+    def count_active(self):
+        return len([task for task in self.tasks if not task['completed']])
 
-@app.route('/api/tasks', methods=['POST'])
-def create_task():
-    data = request.get_json()
-    if not data or 'title' not in data:
-        return jsonify({'error': 'Title is required'}), 400
 
-    title = data['title']
-    description = data.get('description', '')
-    priority = data.get('priority', 'средний')
-    category_id = data.get('category_id')
-    deadline = data.get('deadline')
-    is_completed = data.get('is_completed', False)
+# Создаем глобальный экземпляр
+task_store = TaskStore()
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO tasks (title, description, priority, category_id, deadline, is_completed)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (title, description, priority, category_id, deadline, is_completed))
-    task_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
 
-    return jsonify({
-        'id': task_id,
-        'title': title,
-        'description': description,
-        'priority': priority,
-        'category_id': category_id,
-        'deadline': deadline,
-        'is_completed': is_completed
-    }), 201
-
-# --- Web Endpoints ---
-
-@app.route('/', methods=['GET'])
+@app.route('/')
 def index():
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    filter_type = request.args.get('filter', 'all')
 
-    status = request.args.get('status', 'all')
-    where_clause = {
-        'active': 't.is_completed = 0',
-        'completed': 't.is_completed = 1'
-    }.get(status, '1=1')
+    # Фильтрация задач
+    if filter_type == 'active':
+        filtered_tasks = [task for task in task_store.get_all() if not task['completed']]
+    elif filter_type == 'completed':
+        filtered_tasks = [task for task in task_store.get_all() if task['completed']]
+    else:
+        filtered_tasks = task_store.get_all()
 
-    cursor.execute(f'''
-        SELECT t.*, c.name AS category_name, c.color AS category_color
-        FROM tasks t
-        LEFT JOIN categories c ON t.category_id = c.id
-        WHERE {where_clause}
-        ORDER BY 
-            CASE t.priority WHEN 'высокий' THEN 1 WHEN 'средний' THEN 2 ELSE 3 END,
-            t.deadline ASC NULLS LAST,
-            t.created_at DESC
-    ''')
-    tasks = [dict(row) for row in cursor.fetchall()]
+    # Статистика
+    total = task_store.count()
+    completed = task_store.count_completed()
+    active = task_store.count_active()
 
-    cursor.execute('SELECT COUNT(*) FROM tasks')
-    total = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM tasks WHERE is_completed = 1')
-    completed = cursor.fetchone()[0]
-    conn.close()
+    return render_template('tasks_list.html',
+                           tasks=filtered_tasks,
+                           filter_type=filter_type,
+                           stats={'total': total, 'completed': completed, 'active': active})
 
-    stats = {'total': total, 'completed': completed, 'active': total - completed}
-    return render_template('tasks_list.html', tasks=tasks, stats=stats, filter_status=status)
 
 @app.route('/tasks', methods=['POST'])
-def web_create_task():
-    title = request.form.get('title', '').strip()
-    if not title:
-        return redirect('/')
-    description = request.form.get('description', '').strip()
-    priority = request.form.get('priority', 'средний')
+def create_task():
+    title = request.form.get('title')
+    priority = request.form.get('priority', 'medium')
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('INSERT INTO tasks (title, description, priority, is_completed) VALUES (?, ?, ?, ?)',
-                   (title, description, priority, False))
-    conn.commit()
-    conn.close()
-    return redirect('/')
+    if title and title.strip():
+        task_store.add(title, priority)
+
+    return redirect(url_for('index'))
+
 
 @app.route('/tasks/<int:task_id>/toggle', methods=['POST'])
 def toggle_task(task_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT is_completed FROM tasks WHERE id = ?', (task_id,))
-    row = cursor.fetchone()
-    if row:
-        new_status = 1 - row[0]
-        cursor.execute('UPDATE tasks SET is_completed = ? WHERE id = ?', (new_status, task_id))
-        conn.commit()
-    conn.close()
-    return redirect(request.referrer or '/')
+    task = task_store.get_by_id(task_id)
+    if task:
+        task_store.update(task_id, completed=not task['completed'])
+    return redirect(url_for('index'))
+
 
 @app.route('/tasks/<int:task_id>/delete', methods=['POST'])
 def delete_task(task_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
-    conn.commit()
-    conn.close()
-    return redirect(request.referrer or '/')
+    task_store.delete(task_id)
+    return redirect(url_for('index'))
+
+
+# API endpoints для тестирования
+@app.route('/api/tasks', methods=['GET'])
+def api_get_tasks():
+    """API endpoint для получения всех задач"""
+    filter_type = request.args.get('filter', 'all')
+
+    if filter_type == 'active':
+        tasks = [task for task in task_store.get_all() if not task['completed']]
+    elif filter_type == 'completed':
+        tasks = [task for task in task_store.get_all() if task['completed']]
+    else:
+        tasks = task_store.get_all()
+
+    return jsonify({
+        'tasks': tasks,
+        'count': len(tasks),
+        'total': task_store.count(),
+        'completed': task_store.count_completed(),
+        'active': task_store.count_active()
+    })
+
+
+@app.route('/api/tasks', methods=['POST'])
+def api_create_task():
+    """API endpoint для создания задачи"""
+    data = request.get_json()
+    if not data:
+        data = request.form
+
+    title = data.get('title')
+
+    if not title or not title.strip():
+        return jsonify({'error': 'Title is required'}), 400
+
+    priority = data.get('priority', 'medium')
+    task = task_store.add(title, priority)
+
+    return jsonify({
+        'message': 'Task created successfully',
+        'task': task
+    }), 201
+
+
+@app.route('/api/tasks/<int:task_id>', methods=['GET'])
+def api_get_task(task_id):
+    """API endpoint для получения конкретной задачи"""
+    task = task_store.get_by_id(task_id)
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
+
+    return jsonify({'task': task})
+
+
+@app.route('/api/tasks/<int:task_id>/toggle', methods=['POST'])
+def api_toggle_task(task_id):
+    """API endpoint для переключения статуса задачи"""
+    task = task_store.get_by_id(task_id)
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
+
+    updated_task = task_store.update(task_id, completed=not task['completed'])
+    return jsonify({
+        'message': 'Task toggled successfully',
+        'task': updated_task
+    })
+
+
+@app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
+def api_delete_task(task_id):
+    """API endpoint для удаления задачи"""
+    task = task_store.get_by_id(task_id)
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
+
+    task_store.delete(task_id)
+    return jsonify({'message': 'Task deleted successfully'})
+
 
 if __name__ == '__main__':
-    app.run(debug=True, host='127.0.0.1', port=5000)
-EOF
+    app.run(debug=True)

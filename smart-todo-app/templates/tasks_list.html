@@ -1,130 +1,169 @@
 {% extends "base.html" %}
 
+{% block title %}Список задач - Менеджер задач{% endblock %}
+
 {% block content %}
-<!-- Статистика -->
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="d-flex justify-content-between align-items-center bg-light p-3 rounded">
-            <div>
-                <h5 class="mb-0">📊 Статистика</h5>
-                <div>
-                    <span class="badge bg-primary stats-badge">Всего: {{ stats.total }}</span>
-                    <span class="badge bg-success stats-badge">Выполнено: {{ stats.completed }}</span>
-                    <span class="badge bg-warning text-dark stats-badge">Активно: {{ stats.active }}</span>
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <!-- Статистика -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card stats-card bg-white">
+                    <div class="card-body text-center">
+                        <h5 class="card-title text-muted">Всего задач</h5>
+                        <h2 class="text-primary">{{ stats.total }}</h2>
+                    </div>
                 </div>
             </div>
-            <div>
-                <a href="/" class="btn btn-outline-primary btn-sm">Обновить</a>
+            <div class="col-md-4">
+                <div class="card stats-card bg-white">
+                    <div class="card-body text-center">
+                        <h5 class="card-title text-muted">Активных</h5>
+                        <h2 class="text-warning">{{ stats.active }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stats-card bg-white">
+                    <div class="card-body text-center">
+                        <h5 class="card-title text-muted">Выполнено</h5>
+                        <h2 class="text-success">{{ stats.completed }}</h2>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-</div>
 
-<!-- Фильтры -->
-<div class="row mb-3">
-    <div class="col-md-12">
-        <div class="btn-group" role="group">
-            <a href="/?status=all" class="btn btn-outline-secondary {% if filter_status == 'all' %}active{% endif %}">Все</a>
-            <a href="/?status=active" class="btn btn-outline-secondary {% if filter_status == 'active' %}active{% endif %}">Активные</a>
-            <a href="/?status=completed" class="btn btn-outline-secondary {% if filter_status == 'completed' %}active{% endif %}">Выполненные</a>
-        </div>
-    </div>
-</div>
-
-<!-- Форма добавления задачи -->
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">➕ Добавить новую задачу</h5>
+        <!-- Форма добавления задачи -->
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h4 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Добавить новую задачу</h4>
             </div>
             <div class="card-body">
-                <form method="POST" action="/tasks">
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <input type="text" name="title" class="form-control" placeholder="Название задачи *" required>
-                        </div>
-                        <div class="col-md-4">
-                            <input type="text" name="description" class="form-control" placeholder="Описание (необязательно)">
-                        </div>
-                        <div class="col-md-2">
-                            <select name="priority" class="form-select">
-                                <option value="низкий">Низкий</option>
-                                <option value="средний" selected>Средний</option>
-                                <option value="высокий">Высокий</option>
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-success w-100">Добавить</button>
-                        </div>
+                <form method="POST" action="/tasks" class="row g-3">
+                    <div class="col-md-7">
+                        <input type="text"
+                               class="form-control form-control-lg"
+                               name="title"
+                               placeholder="Что нужно сделать?"
+                               required>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select form-select-lg" name="priority">
+                            <option value="high" class="text-danger">Высокий приоритет</option>
+                            <option value="medium" selected>Средний приоритет</option>
+                            <option value="low" class="text-success">Низкий приоритет</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <i class="bi bi-plus-lg me-1"></i>Добавить
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
-    </div>
-</div>
 
-<!-- Список задач -->
-{% if tasks %}
-    <div class="row">
-        {% for task in tasks %}
-            {% set priority_class = {
-                'высокий': 'priority-high',
-                'средний': 'priority-medium',
-                'низкий': 'priority-low'
-            }[task.priority] %}
-            <div class="col-12 mb-2">
-                <div class="card task-card {{ priority_class }}">
-                    <div class="card-body d-flex align-items-center">
-                        <!-- Статус -->
-                        <form method="POST" action="/tasks/{{ task.id }}/toggle" style="margin: 0;">
-                            <button type="submit" class="btn {{ 'btn-success' if task.is_completed else 'btn-outline-secondary' }} btn-sm me-3"
-                                    title="{{ 'Отметить как невыполненное' if task.is_completed else 'Отметить как выполненное' }}">
-                                {% if task.is_completed %}
-                                    ✅
-                                {% else %}
-                                    ◻
-                                {% endif %}
-                            </button>
-                        </form>
+        <!-- Фильтры -->
+        <div class="d-flex mb-3">
+            <div class="btn-group" role="group">
+                <a href="/?filter=all"
+                   class="btn btn-outline-secondary filter-btn {% if filter_type == 'all' %}active{% endif %}">
+                    Все ({{ stats.total }})
+                </a>
+                <a href="/?filter=active"
+                   class="btn btn-outline-secondary filter-btn {% if filter_type == 'active' %}active{% endif %}">
+                    Активные ({{ stats.active }})
+                </a>
+                <a href="/?filter=completed"
+                   class="btn btn-outline-secondary filter-btn {% if filter_type == 'completed' %}active{% endif %}">
+                    Выполненные ({{ stats.completed }})
+                </a>
+            </div>
+        </div>
 
-                        <!-- Основная информация -->
-                        <div class="flex-grow-1">
-                            <h6 class="mb-1 {% if task.is_completed %}text-decoration-line-through text-muted{% endif %}">
-                                {{ task.title }}
-                                {% if task.category_name %}
-                                    <span class="badge bg-secondary">{{ task.category_name }}</span>
-                                {% endif %}
-                            </h6>
-                            {% if task.description %}
-                                <p class="mb-1 text-muted small">{{ task.description }}</p>
-                            {% endif %}
-                            <div class="d-flex gap-2 small">
-                                <span class="badge bg-{{ 'danger' if task.priority == 'высокий' else 'warning' if task.priority == 'средний' else 'success' }}">
-                                    {{ task.priority }}
-                                </span>
-                                {% if task.deadline %}
-                                    <span class="text-muted">До: {{ task.deadline[:16] }}</span>
-                                {% endif %}
+        <!-- Список задач -->
+        <div class="card">
+            <div class="card-header bg-white">
+                <h4 class="mb-0"><i class="bi bi-list-task me-2"></i>
+                    {% if filter_type == 'all' %}
+                        Все задачи
+                    {% elif filter_type == 'active' %}
+                        Активные задачи
+                    {% else %}
+                        Выполненные задачи
+                    {% endif %}
+                </h4>
+            </div>
+            <div class="card-body p-0">
+                {% if tasks %}
+                    <div class="list-group list-group-flush">
+                        {% for task in tasks %}
+                        <div class="list-group-item priority-{{ task.priority }}
+                                    {% if task.completed %}task-completed{% endif %}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <form method="POST" action="/tasks/{{ task.id }}/toggle" class="me-3">
+                                        <button type="submit" class="btn btn-sm p-0 border-0 bg-transparent">
+                                            {% if task.completed %}
+                                                <i class="bi bi-check-circle-fill text-success" style="font-size: 1.5rem;"></i>
+                                            {% else %}
+                                                <i class="bi bi-circle text-secondary" style="font-size: 1.5rem;"></i>
+                                            {% endif %}
+                                        </button>
+                                    </form>
+                                    <div>
+                                        <h5 class="mb-1">{{ task.title }}</h5>
+                                        <small class="text-muted">
+                                            <i class="bi bi-calendar me-1"></i>Создано: {{ task.created_at }}
+                                            <span class="ms-3">
+                                                {% if task.priority == 'high' %}
+                                                    <span class="badge bg-danger">Высокий приоритет</span>
+                                                {% elif task.priority == 'medium' %}
+                                                    <span class="badge bg-warning text-dark">Средний приоритет</span>
+                                                {% else %}
+                                                    <span class="badge bg-success">Низкий приоритет</span>
+                                                {% endif %}
+                                            </span>
+                                        </small>
+                                    </div>
+                                </div>
+                                <form method="POST" action="/tasks/{{ task.id }}/delete"
+                                      onsubmit="return confirm('Удалить эту задачу?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
                             </div>
                         </div>
-
-                        <!-- Удаление -->
-                        <form method="POST" action="/tasks/{{ task.id }}/delete" style="margin: 0;" 
-                              onsubmit="return confirm('Удалить задачу «{{ task.title }}»?');">
-                            <button type="submit" class="btn btn-outline-danger btn-sm">
-                                🗑️ Удалить
-                            </button>
-                        </form>
+                        {% endfor %}
                     </div>
-                </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-check2-all display-1 text-muted mb-3"></i>
+                        <h4 class="text-muted">
+                            {% if filter_type == 'all' %}
+                                Задач пока нет. Добавьте первую!
+                            {% elif filter_type == 'active' %}
+                                Нет активных задач. Отличная работа!
+                            {% else %}
+                                Выполненных задач пока нет
+                            {% endif %}
+                        </h4>
+                    </div>
+                {% endif %}
             </div>
-        {% endfor %}
+        </div>
+
+        <!-- Информация -->
+        <div class="mt-4 text-center text-muted small">
+            <p>
+                <i class="bi bi-info-circle me-1"></i>
+                Цветные границы слева показывают приоритет задачи:
+                <span class="text-danger">красный</span> - высокий,
+                <span class="text-warning">желтый</span> - средний,
+                <span class="text-success">зеленый</span> - низкий
+            </p>
+        </div>
     </div>
-{% else %}
-    <div class="alert alert-info text-center">
-        <strong>Нет задач</strong><br>
-        Добавьте первую задачу выше!
-    </div>
-{% endif %}
+</div>
 {% endblock %}

@@ -17,3 +17,23 @@
 ---
 
 ## 🗂️ Структура проекта
+# 🚀 Smart Todo App — Умный список задач
+
+> REST API + Веб-интерфейс на Flask с SQLite. Полный стек: от установки до CI/CD.
+
+![CI Status](https://github.com/ВАШ_ЛОГИН/smart-todo-app/actions/workflows/ci.yml/badge.svg)
+
+---
+
+## 🛠️ Установка и запуск
+
+### Требования
+- Python 3.8+
+- Git
+
+### Шаги
+
+1. Клонируйте репозиторий:
+   ```bash
+   git clone https://github.com/ВАШ_ЛОГИН/smart-todo-app.git
+   cd smart-todo-app
