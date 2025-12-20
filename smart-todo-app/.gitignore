@@ -1,0 +1,22 @@
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local database (unless you explicitly want to version it)
+smart_todo.db
+*.db
+
+# IDE / Editors
+.vscode/
+.idea/
+.DS_Store
+
+# Logs, temp files
+*.log
